@@ -1,3 +1,8 @@
+;; A simple snake game in Clojure created to kill time in
+;; the long flight from NYC to SF on 22 Dec 2015.
+;; Adds a few minor features to the base implementation
+;; provided in the "Programming Clojure 2nd Ed by Stuart Hollaway"
+
 (ns snake.core
   (:import (java.awt Color Dimension)
            (javax.swing JPanel JFrame Timer JOptionPane)
@@ -7,12 +12,16 @@
 
 (import-static java.awt.event.KeyEvent VK_LEFT VK_RIGHT VK_UP VK_DOWN)
 
-
-(def width 75)
-(def height 50)      ;; dimensions of the canvas
+(def width 50)
+(def height 30)      ;; dimensions of the canvas
 (def point-size 10)  ;; the size of the point
 (def turn-millis 60) ;; the heartbeat of the game
 (def win-length 10)  ;; turns it take to win
+
+(def LEFT  [-1  0])
+(def RIGHT [ 1  0])
+(def UP    [ 0 -1])
+(def DOWN  [ 0  1])
 
 ;; directions of movement
 (def dirs {VK_LEFT  [-1  0]
@@ -68,32 +77,39 @@
 (defn eats? [{[snake-head] :body} {apple :location}]
   (= snake-head apple))
 
-(def valid-turns
-  {VK_LEFT [VK_UP VK_DOWN]
-   VK_RIGHT [VK_UP VK_DOWN]
-   VK_DOWN [VK_LEFT VK_RIGHT]
-   VK_UP [VK_LEFT VK_RIGHT]})
-
 (defn turn
   "turns the snake in the new dir"
   [snake newdir]
   (assoc snake :dir newdir))
 
-;; MUTABLE FUNCTIONS
-(defn reset-game [snake apple]
+;;;;;;;;;;;;;;;;;;;;;;;
+;; MUTABLE FUNCTIONS ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn reset-game
+  "resets the game"
+  [snake apple]
   (dosync (ref-set apple (create-apple))
           (ref-set snake (create-snake)))
   nil)
 
-;; setting the initial (nil) state
+;; setting the initial (nil) state - for debugging
 (def test-snake (ref nil))
 (def test-apple (ref nil))
 
-;; let's begin by resetting the game
-(reset-game test-snake test-apple)
+(def valid-turns ;; turns that are allowed
+  {LEFT  #{UP   DOWN}
+   RIGHT #{UP   DOWN}
+   UP    #{LEFT RIGHT}
+   DOWN  #{LEFT RIGHT}})
 
-(defn update-direction [snake newdir]
-  (when newdir (dosync (alter snake turn newdir))))
+(defn update-direction
+  "updates the direction of the snake"
+  [snake newdir]
+  (when (and newdir
+             (contains? (valid-turns (:dir @snake))
+                        newdir))
+    (dosync (alter snake turn newdir))))
 
 (defn update-positions
   "updates the positions based on the position of snake and apple"
