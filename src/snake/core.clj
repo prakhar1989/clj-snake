@@ -11,8 +11,8 @@
 (def width 75)
 (def height 50)      ;; dimensions of the canvas
 (def point-size 10)  ;; the size of the point
-(def turn-millis 75) ;; the heartbeat of the game
-(def win-length 5)   ;; turns it take to win
+(def turn-millis 60) ;; the heartbeat of the game
+(def win-length 10)  ;; turns it take to win
 
 ;; directions of movement
 (def dirs {VK_LEFT  [-1  0]
@@ -27,7 +27,7 @@
 
 (defn point-to-screen-rect
   [pt]
-  "convert a point to a rect on the screen"
+  "convert a point to a rect [x y width height]"
   (map #(* point-size %)
        [(pt 0) (pt 1) 1 1]))
 
@@ -68,15 +68,105 @@
 (defn eats? [{[snake-head] :body} {apple :location}]
   (= snake-head apple))
 
+(def valid-turns
+  {VK_LEFT [VK_UP VK_DOWN]
+   VK_RIGHT [VK_UP VK_DOWN]
+   VK_DOWN [VK_LEFT VK_RIGHT]
+   VK_UP [VK_LEFT VK_RIGHT]})
+
 (defn turn
   "turns the snake in the new dir"
   [snake newdir]
   (assoc snake :dir newdir))
 
+;; MUTABLE FUNCTIONS
+(defn reset-game [snake apple]
+  (dosync (ref-set apple (create-apple))
+          (ref-set snake (create-snake)))
+  nil)
 
-(turn (create-snake) (dirs VK_LEFT))
+;; setting the initial (nil) state
+(def test-snake (ref nil))
+(def test-apple (ref nil))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
+;; let's begin by resetting the game
+(reset-game test-snake test-apple)
+
+(defn update-direction [snake newdir]
+  (when newdir (dosync (alter snake turn newdir))))
+
+(defn update-positions
+  "updates the positions based on the position of snake and apple"
+  [snake apple]
+  (dosync
+    (if (eats? @snake @apple)
+      (do                              ;; snake eats the apple
+        (ref-set apple (create-apple)) ;; create a new apple
+        (alter snake move :grow))      ;; make it grow
+      (alter snake move)))             ;; the snake simply moves
+  nil)
+
+;;;;;;;;;;;;;;;;;;;
+;; THE SNAKE GUI ;;
+;;;;;;;;;;;;;;;;;;;
+(defn fill-point
+  [g pt color] ;; g is an instance of java.awt.Graphics instance
+  (let [[x y width height] (point-to-screen-rect pt)]
+    (.setColor g color)
+    (.fillRect g x y width height)))
+
+;; a polymorphic method that knows how to paint the `object`
+(defmulti paint (fn [g object & _] (:type object)))
+
+;; paint an apple
+(defmethod paint :apple [g {:keys [location color]}]
+  (fill-point g location color))
+
+;; paint the snake
+(defmethod paint :snake [g {:keys [body color]}]
+  (doseq [point body]
+    (fill-point g point color)))
+
+;; describe the GUI and setup callbacks
+(defn game-panel [frame snake apple]
+  (proxy [JPanel ActionListener KeyListener] []
+    (paintComponent [g] ;; draws the jframe
+      (proxy-super paintComponent g) ;; call the parent constructor
+      (paint g @snake)
+      (paint g @apple))
+    (actionPerformed [e] ;; called on every timer tick
+      (update-positions snake apple)
+      (when (lose? @snake)
+        (reset-game snake apple)
+        (JOptionPane/showMessageDialog frame "You lose!"))
+      (when (win? @snake)
+        (reset-game snake apple)
+        (JOptionPane/showMessageDialog frame "You win!"))
+      (.repaint this))
+    (keyPressed [e] ;; called when a key is pressed
+      (update-direction snake (dirs (.getKeyCode e))))
+    (getPreferredSize []
+      (Dimension. (* (inc width) point-size)
+                  (* (inc height) point-size)))
+    (keyReleased [e]) ;; dont care about these two callbacks
+    (keyTyped [e])))
+
+;; finally setting the game
+(defn game []
+  (let [snake (ref (create-snake))
+        apple (ref (create-apple))
+        frame (JFrame. "Snake")
+        panel (game-panel frame snake apple)
+        timer (Timer. turn-millis panel)]
+    (doto panel
+      (.setFocusable true)
+      (.addKeyListener panel))
+    (doto frame
+      (.add panel)
+      (.pack)
+      (.setVisible true))
+    (.start timer)
+    [snake, apple, timer]))
+
+(defn -main [& args]
+  (game))
