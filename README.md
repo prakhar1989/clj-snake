@@ -6,6 +6,6 @@ Your beloved snake game in Clojure
 [!img](snake.png)
 
 ``` 
-$ wget 
-$ java -jar snake-0.1.0-standalone.jar [args]
+$ wget https://github.com/prakhar1989/clj-snake/releases/download/v.0.0.1/game.jar
+$ java -jar game.jar
 ```
