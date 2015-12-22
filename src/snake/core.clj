@@ -70,11 +70,24 @@
         body (rest body)]
     (contains? (set body) head)))
 
-;; a better name for the previous function
-(def lose? head-overlaps-body?)
+(defn has-touched-end?
+  "checks if the snake has collided with a canvas boundary"
+  [{[snake-head] :body}]
+  (let [[x y] snake-head]
+    (or (= x (dec 0))
+        (= y (dec 0))
+        (= x (inc width))
+        (= y (inc height)))))
 
-;; determines if a snake eats an apple
-(defn eats? [{[snake-head] :body} {apple :location}]
+(defn lose?
+  "determines when the game loses"
+  [snake]
+  (or (head-overlaps-body? snake)
+      (has-touched-end? snake)))
+
+(defn eats?
+  "determines if a snake eats an apple"
+  [{[snake-head] :body} {apple :location}]
   (= snake-head apple))
 
 (defn turn
